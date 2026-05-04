@@ -1,0 +1,11 @@
+pandas
+numpy
+requests
+matplotlib
+seaborn
+missingno
+xlrd
+openpyxl
+scikit-learn
+xgboost
+jupyter
