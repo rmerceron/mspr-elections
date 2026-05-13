@@ -51,14 +51,16 @@ os.makedirs(CLEAN_DIR, exist_ok=True)
 # ── URLs sources ────────────────────────────────────────────
 URL_ELECTIONS = {
     "pres_2022_t1": (
-        "https://static.data.gouv.fr/resources/elections-presidentielles-2022-resultats-du-1er-tour/"
-        "20250626-142312/elections-presidentielles-2022-resultats-du-1er-tour.csv",
-        "pres_2022_t1.csv",
+        "https://data.nantesmetropole.fr/api/explore/v2.1/catalog/datasets/"
+        "244400404_election-presidentielle-2022-nantes-1er-tour/exports/csv"
+        "?lang=fr&timezone=Europe%2FParis&use_labels=true&delimiter=%3B",
+        "pres_2022_t1_nantes_complet.csv",
     ),
     "pres_2022_t2": (
-        "https://static.data.gouv.fr/resources/elections-presidentielles-2022-resultats-du-2nd-tour/"
-        "20250626-135901/resultats-elections-presidentielles-2022-2nd-tour.csv",
-        "pres_2022_t2.csv",
+        "https://data.nantesmetropole.fr/api/explore/v2.1/catalog/datasets/"
+        "244400404_election-presidentielle-2022-nantes-2nd-tour/exports/csv"
+        "?lang=fr&timezone=Europe%2FParis&use_labels=true&delimiter=%3B",
+        "pres_2022_t2_nantes_complet.csv",
     ),
     "pres_2017_t1": (
         "https://static.data.gouv.fr/resources/election-presidentielle-des-23-avril-et-7-mai-2017-"
@@ -116,9 +118,94 @@ def telecharger_fichier(url: str, nom_fichier: str) -> bytes | None:
         log.error(f"  [✗] Erreur téléchargement {nom_fichier} : {e}")
         return None
 
+def normaliser_colonnes(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalise les noms de colonnes en snake_case."""
+    df = df.copy()
+    df.columns = (
+        df.columns.astype(str)
+        .str.strip()
+        .str.lower()
+        .str.replace("’", "_", regex=False)
+        .str.replace("'", "_", regex=False)
+        .str.replace(" ", "_", regex=False)
+        .str.replace(r"[éèê]", "e", regex=True)
+        .str.replace(r"[àâ]", "a", regex=True)
+        .str.replace(r"[^a-z0-9_]", "_", regex=True)
+        .str.replace(r"_+", "_", regex=True)
+        .str.strip("_")
+    )
+    return df
+
+
+def lire_xls_2017_cantons_nantes(chemin: str, tour_num: int) -> pd.DataFrame:
+    """Lit les résultats 2017 au niveau canton et filtre Nantes-1 à Nantes-7."""
+    sheet_name = f"Canton Tour {tour_num}"
+
+    df_raw = pd.read_excel(chemin, sheet_name=sheet_name, header=None)
+
+    header_row = 0
+    for row_idx in range(min(10, len(df_raw))):
+        row_vals = df_raw.iloc[row_idx].astype(str)
+        if row_vals.str.contains(
+            "Code du département|Libellé du canton|Inscrits",
+            case=False,
+            na=False,
+        ).any():
+            header_row = row_idx
+            break
+
+    df = pd.read_excel(chemin, sheet_name=sheet_name, header=header_row)
+    df.columns = df.columns.astype(str).str.strip()
+
+    df["Code du département"] = (
+        df["Code du département"]
+        .astype(str)
+        .str.replace(".0", "", regex=False)
+        .str.strip()
+        .str.zfill(2)
+    )
+
+    df_nantes = df[
+        (df["Code du département"] == CODE_DEP)
+        & (df["Libellé du canton"].astype(str).str.startswith("Nantes-"))
+    ].copy()
+
+    df_nantes["annee"] = 2017
+    df_nantes["tour"] = f"T{tour_num}"
+    df_nantes["scrutin"] = "presidentielle"
+    df_nantes["code_commune"] = CODE_COMMUNE
+    df_nantes["commune"] = NOM_COMMUNE
+    df_nantes["niveau_geo_source"] = "cantons_nantes"
+    df_nantes["zone_source"] = "Nantes-1 à Nantes-7"
+
+    log.info(f"  → Feuille '{sheet_name}' filtrée : {df_nantes.shape}")
+    log.info(
+        f"  → Inscrits 2017 T{tour_num} Nantes : "
+        f"{pd.to_numeric(df_nantes['Inscrits'], errors='coerce').sum():,.0f}"
+    )
+
+    return df_nantes
+
+
+def lire_csv_2022_nantes(chemin: str, annee: int, tour: str) -> pd.DataFrame:
+    """Lit les résultats 2022 Nantes Métropole au niveau bureau de vote."""
+    df = pd.read_csv(chemin, sep=";", encoding="utf-8", low_memory=False)
+    df.columns = df.columns.astype(str).str.strip()
+
+    df["annee"] = annee
+    df["tour"] = tour
+    df["scrutin"] = "presidentielle"
+    df["code_commune"] = CODE_COMMUNE
+    df["commune"] = NOM_COMMUNE
+    df["niveau_geo_source"] = "bureaux_vote_nantes"
+    df["zone_source"] = NOM_COMMUNE
+
+    log.info(f"  → CSV 2022 {tour} Nantes : {df.shape}")
+
+    return df
 
 def extract_elections() -> dict[str, pd.DataFrame | None]:
-    """EXTRACT — Résultats électoraux 2017 et 2022 (CSV + XLS)."""
+    """EXTRACT — Résultats électoraux Nantes 2017 et 2022."""
     log.info("── EXTRACT : Données électorales ──────────────────────────")
     resultats = {}
 
@@ -127,37 +214,28 @@ def extract_elections() -> dict[str, pd.DataFrame | None]:
         if contenu is None:
             resultats[cle] = None
             continue
+
         chemin = os.path.join(RAW_DIR, fichier)
+
         try:
-            if fichier.endswith(".xls") or fichier.endswith(".xlsx"):
-                # Fichiers XLS du Ministère de l'Intérieur — plusieurs feuilles possibles
-                sheets = pd.read_excel(chemin, sheet_name=None, header=None)
-                df = None
-                for sheet_name, df_raw in sheets.items():
-                    # str() explicite sur chaque valeur pour gérer les NaN (float) dans les cellules vides
-                    content_str = " ".join(str(v) for v in df_raw.values.flatten())
-                    if CODE_COMMUNE in content_str or f" {CODE_DEP} " in content_str:
-                        # Détecter la ligne d'en-tête
-                        header_row = 0
-                        for idx in range(min(5, len(df_raw))):
-                            if df_raw.iloc[idx].astype(str).str.contains(
-                                "Code|Libellé|Inscrits", case=False, na=False
-                            ).any():
-                                header_row = idx
-                                break
-                        df = pd.read_excel(chemin, sheet_name=sheet_name, header=header_row)
-                        log.info(f"  → Feuille '{sheet_name}' : {df.shape}")
-                        break
-                if df is None:
-                    # Aucune feuille avec le code commune → première feuille
-                    first = list(sheets.keys())[0]
-                    df = pd.read_excel(chemin, sheet_name=first, header=0)
-                    log.warning(f"Code commune non trouvé — feuille '{first}' utilisée")
-                resultats[cle] = df
+            if cle == "pres_2017_t1":
+                df = lire_xls_2017_cantons_nantes(chemin, tour_num=1)
+
+            elif cle == "pres_2017_t2":
+                df = lire_xls_2017_cantons_nantes(chemin, tour_num=2)
+
+            elif cle == "pres_2022_t1":
+                df = lire_csv_2022_nantes(chemin, annee=2022, tour="T1")
+
+            elif cle == "pres_2022_t2":
+                df = lire_csv_2022_nantes(chemin, annee=2022, tour="T2")
+
             else:
-                df = pd.read_csv(chemin, sep=";", encoding="utf-8", low_memory=False)
-                log.info(f"  → {cle} : {df.shape}")
-                resultats[cle] = df
+                log.warning(f"Source électorale inconnue : {cle}")
+                df = None
+
+            resultats[cle] = df
+
         except Exception as e:
             log.error(f"  [✗] Lecture {fichier} : {e}")
             resultats[cle] = None
@@ -330,7 +408,12 @@ def _detecter_col(df: pd.DataFrame, mots_cles: list[str]) -> str | None:
 
 
 def transform_elections(dfs: dict[str, pd.DataFrame | None]) -> dict[str, pd.DataFrame]:
-    """TRANSFORM — Filtre, nettoie et standardise les données électorales."""
+    """
+    TRANSFORM — Nettoie et standardise les données électorales.
+
+    2017 : cantons Nantes-1 à Nantes-7.
+    2022 : bureaux de vote Nantes Métropole.
+    """
     log.info("── TRANSFORM : Données électorales ────────────────────────")
     resultats = {}
 
@@ -339,51 +422,105 @@ def transform_elections(dfs: dict[str, pd.DataFrame | None]) -> dict[str, pd.Dat
             log.warning(f"{cle} : DataFrame vide — ignoré")
             continue
 
-        annee = cle.split("_")[1]   # "2022" ou "2017"
-        tour  = cle.split("_")[2].upper()  # "T1" ou "T2"
+        df_clean = normaliser_colonnes(df)
 
-        # Détecter la colonne commune/département
-        col_com = _detecter_col(df, ["code commune", "code_commune", "insee_com", "commune"])
-        col_dep = _detecter_col(df, ["département", "departement", "code_dep", "dep"])
+        # Renommage des colonnes 2022 Nantes Métropole vers un format commun
+        renommage = {
+            "nombre_d_inscrits": "inscrits",
+            "nombre_de_votants": "votants",
+            "nombre_de_bulletins_blancs": "blancs",
+            "nombre_de_bulletins_nuls": "nuls",
+            "nombre_de_bulletins_exprimes": "exprimes",
+            "nombre_de_procurations": "procurations",
+        }
 
-        if col_com:
-            df[col_com] = df[col_com].astype(str).str.strip().str.zfill(5)
-            df_nantes = df[df[col_com] == CODE_COMMUNE].copy()
-        elif col_dep:
-            df[col_dep] = df[col_dep].astype(str).str.strip().str.zfill(2)
-            df_nantes = df[df[col_dep] == CODE_DEP].copy()
-        else:
-            # CSV déjà filtré sur Nantes (bureaux de vote uniquement)
-            df_nantes = df.copy()
-            log.info(f"  → {cle} : fichier déjà filtré sur Nantes ({len(df_nantes)} lignes)")
-
-        # Ajouter colonnes de contexte
-        df_nantes["annee"]   = annee
-        df_nantes["tour"]    = tour
-        df_nantes["scrutin"] = "presidentielle"
-        df_nantes["code_commune"] = CODE_COMMUNE
-
-        # Renommer les colonnes en snake_case
-        df_nantes.columns = (
-            df_nantes.columns
-            .str.strip()
-            .str.lower()
-            .str.replace(" ", "_", regex=False)
-            .str.replace(r"[éèê]", "e", regex=True)
-            .str.replace(r"[àâ]", "a", regex=True)
-            .str.replace(r"[^a-z0-9_]", "_", regex=True)
+        df_clean = df_clean.rename(
+            columns={old: new for old, new in renommage.items() if old in df_clean.columns}
         )
 
-        # Supprimer les doublons
-        avant = len(df_nantes)
-        df_nantes = df_nantes.drop_duplicates()
-        if avant != len(df_nantes):
-            log.info(f"  → {cle} : {avant - len(df_nantes)} doublon(s) supprimé(s)")
+        # Conversion numérique des colonnes électorales principales
+        for col in ["inscrits", "votants", "blancs", "nuls", "exprimes", "abstentions", "procurations"]:
+            if col in df_clean.columns:
+                df_clean[col] = pd.to_numeric(df_clean[col], errors="coerce")
 
-        log.info(f"  → {cle} : {df_nantes.shape[0]} lignes × {df_nantes.shape[1]} colonnes")
-        resultats[cle] = df_nantes
+        # Taux électoraux
+        if "inscrits" in df_clean.columns and "votants" in df_clean.columns:
+            df_clean["taux_participation"] = (df_clean["votants"] / df_clean["inscrits"]).round(4)
+            df_clean["taux_abstention"] = (1 - df_clean["taux_participation"]).round(4)
+
+        df_clean["zone_analyse"] = NOM_COMMUNE
+        df_clean["code_commune"] = CODE_COMMUNE
+
+        avant = len(df_clean)
+        df_clean = df_clean.drop_duplicates()
+
+        if avant != len(df_clean):
+            log.info(f"  → {cle} : {avant - len(df_clean)} doublon(s) supprimé(s)")
+
+        log.info(f"  → {cle} : {df_clean.shape[0]} lignes × {df_clean.shape[1]} colonnes")
+
+        resultats[cle] = df_clean
 
     return resultats
+
+def construire_cible_electorale(elections: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """Construit la cible électorale agrégée : participation / abstention par année et tour."""
+    lignes = []
+
+    for cle, df in elections.items():
+        if df is None or df.empty:
+            continue
+
+        df = df.copy()
+
+        if "inscrits" not in df.columns or "votants" not in df.columns:
+            log.warning(f"{cle} : colonnes inscrits/votants absentes — cible ignorée")
+            continue
+
+        # 2022 : une ligne par bureau de vote.
+        if "bureau_de_vote" in df.columns:
+            df_agreg = df.drop_duplicates(subset=["bureau_de_vote"]).copy()
+            niveau_geo = "bureaux_vote_nantes"
+            nb_unites = df_agreg["bureau_de_vote"].nunique()
+
+        # 2017 : une ligne par canton nantais.
+        elif "libelle_du_canton" in df.columns:
+            df_agreg = df.copy()
+            niveau_geo = "cantons_nantes"
+            nb_unites = df_agreg["libelle_du_canton"].nunique()
+
+        else:
+            df_agreg = df.copy()
+            niveau_geo = "agregat"
+            nb_unites = len(df_agreg)
+
+        inscrits = pd.to_numeric(df_agreg["inscrits"], errors="coerce").sum()
+        votants = pd.to_numeric(df_agreg["votants"], errors="coerce").sum()
+        blancs = pd.to_numeric(df_agreg["blancs"], errors="coerce").sum() if "blancs" in df_agreg.columns else np.nan
+        nuls = pd.to_numeric(df_agreg["nuls"], errors="coerce").sum() if "nuls" in df_agreg.columns else np.nan
+        exprimes = pd.to_numeric(df_agreg["exprimes"], errors="coerce").sum() if "exprimes" in df_agreg.columns else np.nan
+
+        lignes.append({
+            "annee": int(df_agreg["annee"].iloc[0]),
+            "tour": df_agreg["tour"].iloc[0],
+            "zone_analyse": NOM_COMMUNE,
+            "code_commune": CODE_COMMUNE,
+            "niveau_geo_electoral": niveau_geo,
+            "nb_unites_geo": int(nb_unites),
+            "inscrits": int(inscrits),
+            "votants": int(votants),
+            "blancs": int(blancs) if not pd.isna(blancs) else None,
+            "nuls": int(nuls) if not pd.isna(nuls) else None,
+            "exprimes": int(exprimes) if not pd.isna(exprimes) else None,
+            "taux_participation": round(votants / inscrits, 4),
+            "taux_abstention": round(1 - (votants / inscrits), 4),
+        })
+
+    cible = pd.DataFrame(lignes).sort_values(["annee", "tour"]).reset_index(drop=True)
+
+    log.info(f"  → Cible électorale construite : {cible.shape}")
+
+    return cible
 
 
 def transform_securite(df: pd.DataFrame | None) -> pd.DataFrame | None:
@@ -472,7 +609,7 @@ def transform_nettoyer(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     cols_interpoler = [
         "population", "croissance_pct", "taux_chomage_pct", "creations_entreprises",
         "revenu_median_uc", "taux_pauvrete_pct", "indice_gini", "rapport_d9_d1",
-        "nb_associations", "creations_asso",
+        "nb_associations", "creations_asso", "total_faits_delictueux",
     ]
     for col in cols_interpoler:
         if col in df_clean.columns and df_clean[col].isna().any():
@@ -505,6 +642,7 @@ def load_sqlite(
     df_clean: pd.DataFrame,
     df_norm: pd.DataFrame,
     elections: dict[str, pd.DataFrame],
+    target_elections: pd.DataFrame,
     df_secu_brut: pd.DataFrame | None,
 ) -> None:
     """LOAD — Crée la base SQLite et charge toutes les tables."""
@@ -527,6 +665,11 @@ def load_sqlite(
             nom_table = f"elections_{cle}"
             df.to_sql(nom_table, con, if_exists="replace", index=False)
             log.info(f"  → Table '{nom_table}' : {len(df)} lignes")
+
+    # Table cible électorale agrégée
+    if target_elections is not None and not target_elections.empty:
+        target_elections.to_sql("target_elections", con, if_exists="replace", index=False)
+        log.info(f"  → Table 'target_elections' : {len(target_elections)} lignes")
 
     # Table sécurité brute département 44
     if df_secu_brut is not None and not df_secu_brut.empty:
@@ -559,6 +702,7 @@ def load_csv(
     df_clean: pd.DataFrame,
     df_norm: pd.DataFrame,
     elections: dict[str, pd.DataFrame],
+    target_elections: pd.DataFrame,
     df_secu_brut: pd.DataFrame | None,
 ) -> None:
     """LOAD — Export CSV de tous les datasets."""
@@ -575,6 +719,9 @@ def load_csv(
     for cle, df in elections.items():
         if df is not None and not df.empty:
             sauvegarder(df, f"elections_{cle}_nantes.csv")
+
+    if target_elections is not None and not target_elections.empty:
+        sauvegarder(target_elections, "target_elections.csv")
 
     if df_secu_brut is not None and not df_secu_brut.empty:
         sauvegarder(df_secu_brut, "securite_dep44_clean.csv")
@@ -603,13 +750,15 @@ def run_pipeline() -> None:
 
     # ── TRANSFORM ────────────────────────────────────────────
     elections_clean = transform_elections(elections_raw)
-    securite_agg    = transform_securite(securite_raw)
-    df_consolide    = transform_consolider(pop, emploi, entreprises, filosofi, associations, securite_agg)
+    target_elections = construire_cible_electorale(elections_clean)
+
+    securite_agg = transform_securite(securite_raw)
+    df_consolide = transform_consolider(pop, emploi, entreprises, filosofi, associations, securite_agg)
     df_clean, df_norm = transform_nettoyer(df_consolide)
 
     # ── LOAD ─────────────────────────────────────────────────
-    load_sqlite(df_clean, df_norm, elections_clean, securite_agg)
-    load_csv(df_clean, df_norm, elections_clean, securite_agg)
+    load_sqlite(df_clean, df_norm, elections_clean, target_elections, securite_agg)
+    load_csv(df_clean, df_norm, elections_clean, target_elections, securite_agg)
 
     # ── RÉCAPITULATIF ─────────────────────────────────────────
     duree = (datetime.now() - debut).total_seconds()

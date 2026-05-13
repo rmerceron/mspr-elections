@@ -1,0 +1,244 @@
+13:34:28  INFO      ============================================================
+13:34:28  INFO        PIPELINE ETL — Electio-Analytics — Nantes
+13:34:28  INFO        Démarrage : 2026-05-04 13:34:28
+13:34:28  INFO      ============================================================
+13:34:28  INFO      ── EXTRACT : Données électorales ──────────────────────────
+13:34:28  INFO        [cache] pres_2022_t1.csv
+13:34:28  INFO        → pres_2022_t1 : (228, 12)
+13:34:28  INFO        [cache] pres_2022_t2.csv
+13:34:28  INFO        → pres_2022_t2 : (38, 12)
+13:34:28  INFO        [cache] pres_2017_t1.xls
+13:34:29  INFO        → Feuille 'Régions Tour 1' : (18, 82)
+13:34:29  INFO        [cache] pres_2017_t2.xls
+13:34:29  INFO        → Feuille 'Régions Tour 2' : (18, 28)
+13:34:29  INFO      ── EXTRACT : Données sécurité (SSMSI) ────────────────────
+13:34:29  INFO        [↓] Téléchargement : securite_dep.csv ...
+13:34:29  INFO        [✓] Sauvegardé (1954 Ko)
+13:34:29  INFO        → Dimensions totales : (18180, 11)
+13:34:29  INFO      ── EXTRACT : Données démographiques (INSEE) ───────────────
+13:34:30  INFO        → Population 2024 (API INSEE) : 327,734
+13:34:30  INFO        → Série démographique : 11 points
+13:34:30  INFO      ── EXTRACT : Données emploi (INSEE zone 5301) ─────────────
+13:34:30  INFO        → 14 années chargées (2012–2025)
+13:34:30  INFO      ── EXTRACT : Données entreprises (INSEE SIRENE) ───────────
+13:34:30  INFO        → Total établissements actifs Nantes (API SIRENE) : 10,000
+13:34:30  INFO        → 14 années chargées (2012–2025)
+13:34:30  INFO      ── EXTRACT : Données Filosofi (INSEE) ────────────────────
+13:34:30  INFO        → 7 années chargées (2015–2021)
+13:34:30  INFO      ── EXTRACT : Données associations (RNA) ───────────────────
+13:34:30  INFO        → 14 années chargées (2012–2025)
+13:34:30  INFO      ── TRANSFORM : Données électorales ────────────────────────
+13:34:30  INFO        → pres_2022_t1 : fichier déjà filtré sur Nantes (228 lignes)
+13:34:30  INFO        → pres_2022_t1 : 228 lignes × 16 colonnes
+13:34:30  INFO        → pres_2022_t2 : fichier déjà filtré sur Nantes (38 lignes)
+13:34:30  INFO        → pres_2022_t2 : 38 lignes × 16 colonnes
+13:34:30  INFO        → pres_2017_t1 : fichier déjà filtré sur Nantes (18 lignes)
+13:34:30  INFO        → pres_2017_t1 : 18 lignes × 86 colonnes
+13:34:30  INFO        → pres_2017_t2 : fichier déjà filtré sur Nantes (18 lignes)
+13:34:30  INFO        → pres_2017_t2 : 18 lignes × 32 colonnes
+13:34:30  INFO      ── TRANSFORM : Données sécurité ────────────────────────────
+13:34:30  INFO        → Dep. 44 : 180 lignes
+13:34:30  INFO        → Agrégé : 10 années
+13:34:30  INFO      ── TRANSFORM : Consolidation du dataset annuel ─────────────
+13:34:30  INFO        → Dataset consolidé : 14 lignes × 14 colonnes
+13:34:30  INFO      ── TRANSFORM : Nettoyage et normalisation ──────────────────
+13:34:30  INFO        → Interpolation 'population' : 6 → 0 NaN
+13:34:30  INFO        → Interpolation 'croissance_pct' : 6 → 0 NaN
+13:34:30  INFO        → Interpolation 'revenu_median_uc' : 7 → 0 NaN
+13:34:30  INFO        → Interpolation 'taux_pauvrete_pct' : 7 → 0 NaN
+13:34:30  INFO        → Interpolation 'indice_gini' : 7 → 0 NaN
+13:34:30  INFO        → Interpolation 'rapport_d9_d1' : 7 → 0 NaN
+13:34:30  INFO        → Valeurs manquantes restantes : 4
+13:34:30  INFO        → Dataset nettoyé : (14, 14)
+13:34:30  INFO        → Dataset normalisé : (14, 25) (11 colonnes _norm)
+13:34:30  INFO      ── LOAD : Base SQLite ──────────────────────────────────────
+13:34:30  INFO        → Table 'indicateurs_annuels' : 14 lignes
+13:34:30  INFO        → Table 'indicateurs_normalises' : 14 lignes
+13:34:30  INFO        → Table 'elections_pres_2022_t1' : 228 lignes
+13:34:30  INFO        → Table 'elections_pres_2022_t2' : 38 lignes
+13:34:30  INFO        → Table 'elections_pres_2017_t1' : 18 lignes
+13:34:30  INFO        → Table 'elections_pres_2017_t2' : 18 lignes
+13:34:30  INFO        → Table 'securite_dep44' : 10 lignes
+13:34:30  INFO        → Table 'pipeline_log' mise à jour
+13:34:30  INFO        → Base SQLite : /Users/thibault/Desktop/mspr/mspr-elections/data/clean/electio_analytics.db
+13:34:30  INFO      ── LOAD : Export CSV ───────────────────────────────────────
+13:34:30  INFO        → nantes_indicateurs_clean.csv (14 lignes)
+13:34:30  INFO        → nantes_indicateurs_normalises.csv (14 lignes)
+13:34:30  INFO        → elections_pres_2022_t1_nantes.csv (228 lignes)
+13:34:30  INFO        → elections_pres_2022_t2_nantes.csv (38 lignes)
+13:34:30  INFO        → elections_pres_2017_t1_nantes.csv (18 lignes)
+13:34:30  INFO        → elections_pres_2017_t2_nantes.csv (18 lignes)
+13:34:30  INFO        → securite_dep44_clean.csv (10 lignes)
+13:34:30  INFO      ============================================================
+13:34:30  INFO        PIPELINE TERMINÉ
+13:34:30  INFO        Durée          : 2.6s
+13:34:30  INFO        Lignes         : 14
+13:34:30  INFO        Colonnes       : 14
+13:34:30  INFO        Période        : 2012–2025
+13:34:30  INFO        Base SQLite    : /Users/thibault/Desktop/mspr/mspr-elections/data/clean/electio_analytics.db
+13:34:30  INFO        CSV nettoyé    : data/clean/nantes_indicateurs_clean.csv
+13:34:30  INFO        CSV normalisé  : data/clean/nantes_indicateurs_normalises.csv
+13:34:30  INFO      ============================================================
+13:39:14  INFO      ============================================================
+13:39:14  INFO        PIPELINE ETL — Electio-Analytics — Nantes
+13:39:14  INFO        Démarrage : 2026-05-04 13:39:14
+13:39:14  INFO      ============================================================
+13:39:14  INFO      ── EXTRACT : Données électorales ──────────────────────────
+13:39:14  INFO        [cache] pres_2022_t1.csv
+13:39:14  INFO        → pres_2022_t1 : (228, 12)
+13:39:14  INFO        [cache] pres_2022_t2.csv
+13:39:14  INFO        → pres_2022_t2 : (38, 12)
+13:39:14  INFO        [cache] pres_2017_t1.xls
+13:39:15  INFO        → Feuille 'Régions Tour 1' : (18, 82)
+13:39:15  INFO        [cache] pres_2017_t2.xls
+13:39:15  INFO        → Feuille 'Régions Tour 2' : (18, 28)
+13:39:15  INFO      ── EXTRACT : Données sécurité (SSMSI) ────────────────────
+13:39:15  INFO        [cache] securite_dep.csv
+13:39:15  INFO        → Dimensions totales : (18180, 11)
+13:39:15  INFO      ── EXTRACT : Données démographiques (INSEE) ───────────────
+13:39:15  INFO        → Population 2024 (API INSEE) : 327,734
+13:39:15  INFO        → Série démographique : 11 points
+13:39:15  INFO      ── EXTRACT : Données emploi (INSEE zone 5301) ─────────────
+13:39:15  INFO        → 14 années chargées (2012–2025)
+13:39:15  INFO      ── EXTRACT : Données entreprises (INSEE SIRENE) ───────────
+13:39:16  INFO        → Total établissements actifs Nantes (API SIRENE) : 10,000
+13:39:16  INFO        → 14 années chargées (2012–2025)
+13:39:16  INFO      ── EXTRACT : Données Filosofi (INSEE) ────────────────────
+13:39:16  INFO        → 7 années chargées (2015–2021)
+13:39:16  INFO      ── EXTRACT : Données associations (RNA) ───────────────────
+13:39:16  INFO        → 14 années chargées (2012–2025)
+13:39:16  INFO      ── TRANSFORM : Données électorales ────────────────────────
+13:39:16  INFO        → pres_2022_t1 : fichier déjà filtré sur Nantes (228 lignes)
+13:39:16  INFO        → pres_2022_t1 : 228 lignes × 16 colonnes
+13:39:16  INFO        → pres_2022_t2 : fichier déjà filtré sur Nantes (38 lignes)
+13:39:16  INFO        → pres_2022_t2 : 38 lignes × 16 colonnes
+13:39:16  INFO        → pres_2017_t1 : fichier déjà filtré sur Nantes (18 lignes)
+13:39:16  INFO        → pres_2017_t1 : 18 lignes × 86 colonnes
+13:39:16  INFO        → pres_2017_t2 : fichier déjà filtré sur Nantes (18 lignes)
+13:39:16  INFO        → pres_2017_t2 : 18 lignes × 32 colonnes
+13:39:16  INFO      ── TRANSFORM : Données sécurité ────────────────────────────
+13:39:16  INFO        → Dep. 44 : 180 lignes
+13:39:16  INFO        → Agrégé : 10 années
+13:39:16  INFO      ── TRANSFORM : Consolidation du dataset annuel ─────────────
+13:39:16  INFO        → Dataset consolidé : 14 lignes × 14 colonnes
+13:39:16  INFO      ── TRANSFORM : Nettoyage et normalisation ──────────────────
+13:39:16  INFO        → Interpolation 'population' : 6 → 0 NaN
+13:39:16  INFO        → Interpolation 'croissance_pct' : 6 → 0 NaN
+13:39:16  INFO        → Interpolation 'revenu_median_uc' : 7 → 0 NaN
+13:39:16  INFO        → Interpolation 'taux_pauvrete_pct' : 7 → 0 NaN
+13:39:16  INFO        → Interpolation 'indice_gini' : 7 → 0 NaN
+13:39:16  INFO        → Interpolation 'rapport_d9_d1' : 7 → 0 NaN
+13:39:16  INFO        → Interpolation 'total_faits_delictueux' : 4 → 0 NaN
+13:39:16  INFO        → Valeurs manquantes restantes : 0
+13:39:16  INFO        → Dataset nettoyé : (14, 14)
+13:39:16  INFO        → Dataset normalisé : (14, 25) (11 colonnes _norm)
+13:39:16  INFO      ── LOAD : Base SQLite ──────────────────────────────────────
+13:39:16  INFO        → Table 'indicateurs_annuels' : 14 lignes
+13:39:16  INFO        → Table 'indicateurs_normalises' : 14 lignes
+13:39:16  INFO        → Table 'elections_pres_2022_t1' : 228 lignes
+13:39:16  INFO        → Table 'elections_pres_2022_t2' : 38 lignes
+13:39:16  INFO        → Table 'elections_pres_2017_t1' : 18 lignes
+13:39:16  INFO        → Table 'elections_pres_2017_t2' : 18 lignes
+13:39:16  INFO        → Table 'securite_dep44' : 10 lignes
+13:39:16  INFO        → Table 'pipeline_log' mise à jour
+13:39:16  INFO        → Base SQLite : /Users/thibault/Desktop/mspr/mspr-elections/data/clean/electio_analytics.db
+13:39:16  INFO      ── LOAD : Export CSV ───────────────────────────────────────
+13:39:16  INFO        → nantes_indicateurs_clean.csv (14 lignes)
+13:39:16  INFO        → nantes_indicateurs_normalises.csv (14 lignes)
+13:39:16  INFO        → elections_pres_2022_t1_nantes.csv (228 lignes)
+13:39:16  INFO        → elections_pres_2022_t2_nantes.csv (38 lignes)
+13:39:16  INFO        → elections_pres_2017_t1_nantes.csv (18 lignes)
+13:39:16  INFO        → elections_pres_2017_t2_nantes.csv (18 lignes)
+13:39:16  INFO        → securite_dep44_clean.csv (10 lignes)
+13:39:16  INFO      ============================================================
+13:39:16  INFO        PIPELINE TERMINÉ
+13:39:16  INFO        Durée          : 1.9s
+13:39:16  INFO        Lignes         : 14
+13:39:16  INFO        Colonnes       : 14
+13:39:16  INFO        Période        : 2012–2025
+13:39:16  INFO        Base SQLite    : /Users/thibault/Desktop/mspr/mspr-elections/data/clean/electio_analytics.db
+13:39:16  INFO        CSV nettoyé    : data/clean/nantes_indicateurs_clean.csv
+13:39:16  INFO        CSV normalisé  : data/clean/nantes_indicateurs_normalises.csv
+13:39:16  INFO      ============================================================
+10:57:54  INFO      ============================================================
+10:57:54  INFO        PIPELINE ETL — Electio-Analytics — Nantes
+10:57:54  INFO        Démarrage : 2026-05-13 10:57:54
+10:57:54  INFO      ============================================================
+10:57:54  INFO      ── EXTRACT : Données électorales ──────────────────────────
+10:57:54  INFO        [cache] pres_2022_t1_nantes_complet.csv
+10:57:54  INFO        → CSV 2022 T1 Nantes : (207, 26)
+10:57:54  INFO        [cache] pres_2022_t2_nantes_complet.csv
+10:57:54  INFO        → CSV 2022 T2 Nantes : (206, 16)
+10:57:54  INFO        [cache] pres_2017_t1.xls
+10:57:55  INFO        → Feuille 'Canton Tour 1' filtrée : (7, 102)
+10:57:55  INFO        → Inscrits 2017 T1 Nantes : 187,820
+10:57:55  INFO        [cache] pres_2017_t2.xls
+10:57:55  INFO        → Feuille 'Canton Tour 2' filtrée : (7, 39)
+10:57:55  INFO        → Inscrits 2017 T2 Nantes : 187,771
+10:57:55  INFO      ── EXTRACT : Données sécurité (SSMSI) ────────────────────
+10:57:55  INFO        [cache] securite_dep.csv
+10:57:55  INFO        → Dimensions totales : (18180, 11)
+10:57:55  INFO      ── EXTRACT : Données démographiques (INSEE) ───────────────
+10:57:55  INFO        → Population 2024 (API INSEE) : 327,734
+10:57:55  INFO        → Série démographique : 11 points
+10:57:55  INFO      ── EXTRACT : Données emploi (INSEE zone 5301) ─────────────
+10:57:55  INFO        → 14 années chargées (2012–2025)
+10:57:55  INFO      ── EXTRACT : Données entreprises (INSEE SIRENE) ───────────
+10:57:56  INFO        → Total établissements actifs Nantes (API SIRENE) : 10,000
+10:57:56  INFO        → 14 années chargées (2012–2025)
+10:57:56  INFO      ── EXTRACT : Données Filosofi (INSEE) ────────────────────
+10:57:56  INFO        → 7 années chargées (2015–2021)
+10:57:56  INFO      ── EXTRACT : Données associations (RNA) ───────────────────
+10:57:56  INFO        → 14 années chargées (2012–2025)
+10:57:56  INFO      ── TRANSFORM : Données électorales ────────────────────────
+10:57:56  INFO        → pres_2022_t1 : 207 lignes × 29 colonnes
+10:57:56  INFO        → pres_2022_t2 : 206 lignes × 19 colonnes
+10:57:56  INFO        → pres_2017_t1 : 7 lignes × 105 colonnes
+10:57:56  INFO        → pres_2017_t2 : 7 lignes × 42 colonnes
+10:57:56  INFO        → Cible électorale construite : (4, 13)
+10:57:56  INFO      ── TRANSFORM : Données sécurité ────────────────────────────
+10:57:56  INFO        → Dep. 44 : 180 lignes
+10:57:56  INFO        → Agrégé : 10 années
+10:57:56  INFO      ── TRANSFORM : Consolidation du dataset annuel ─────────────
+10:57:56  INFO        → Dataset consolidé : 14 lignes × 14 colonnes
+10:57:56  INFO      ── TRANSFORM : Nettoyage et normalisation ──────────────────
+10:57:56  INFO        → Interpolation 'population' : 6 → 0 NaN
+10:57:56  INFO        → Interpolation 'croissance_pct' : 6 → 0 NaN
+10:57:56  INFO        → Interpolation 'revenu_median_uc' : 7 → 0 NaN
+10:57:56  INFO        → Interpolation 'taux_pauvrete_pct' : 7 → 0 NaN
+10:57:56  INFO        → Interpolation 'indice_gini' : 7 → 0 NaN
+10:57:56  INFO        → Interpolation 'rapport_d9_d1' : 7 → 0 NaN
+10:57:56  INFO        → Interpolation 'total_faits_delictueux' : 4 → 0 NaN
+10:57:56  INFO        → Valeurs manquantes restantes : 0
+10:57:56  INFO        → Dataset nettoyé : (14, 14)
+10:57:56  INFO        → Dataset normalisé : (14, 25) (11 colonnes _norm)
+10:57:56  INFO      ── LOAD : Base SQLite ──────────────────────────────────────
+10:57:56  INFO        → Table 'indicateurs_annuels' : 14 lignes
+10:57:56  INFO        → Table 'indicateurs_normalises' : 14 lignes
+10:57:56  INFO        → Table 'elections_pres_2022_t1' : 207 lignes
+10:57:56  INFO        → Table 'elections_pres_2022_t2' : 206 lignes
+10:57:56  INFO        → Table 'elections_pres_2017_t1' : 7 lignes
+10:57:56  INFO        → Table 'elections_pres_2017_t2' : 7 lignes
+10:57:56  INFO        → Table 'target_elections' : 4 lignes
+10:57:56  INFO        → Table 'securite_dep44' : 10 lignes
+10:57:56  INFO        → Table 'pipeline_log' mise à jour
+10:57:56  INFO        → Base SQLite : /Users/thibault/Desktop/mspr/mspr-elections/data/clean/electio_analytics.db
+10:57:56  INFO      ── LOAD : Export CSV ───────────────────────────────────────
+10:57:56  INFO        → nantes_indicateurs_clean.csv (14 lignes)
+10:57:56  INFO        → nantes_indicateurs_normalises.csv (14 lignes)
+10:57:56  INFO        → elections_pres_2022_t1_nantes.csv (207 lignes)
+10:57:56  INFO        → elections_pres_2022_t2_nantes.csv (206 lignes)
+10:57:56  INFO        → elections_pres_2017_t1_nantes.csv (7 lignes)
+10:57:56  INFO        → elections_pres_2017_t2_nantes.csv (7 lignes)
+10:57:56  INFO        → target_elections.csv (4 lignes)
+10:57:56  INFO        → securite_dep44_clean.csv (10 lignes)
+10:57:56  INFO      ============================================================
+10:57:56  INFO        PIPELINE TERMINÉ
+10:57:56  INFO        Durée          : 2.3s
+10:57:56  INFO        Lignes         : 14
+10:57:56  INFO        Colonnes       : 14
+10:57:56  INFO        Période        : 2012–2025
+10:57:56  INFO        Base SQLite    : /Users/thibault/Desktop/mspr/mspr-elections/data/clean/electio_analytics.db
+10:57:56  INFO        CSV nettoyé    : data/clean/nantes_indicateurs_clean.csv
+10:57:56  INFO        CSV normalisé  : data/clean/nantes_indicateurs_normalises.csv
+10:57:56  INFO      ============================================================
