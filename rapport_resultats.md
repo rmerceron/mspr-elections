@@ -145,6 +145,8 @@ modèle régularisé (Ridge).
 - **Corrélation indicateurs ↔ abstention** : toutes proches de **± 0.66** en valeur absolue (effet
   mécanique lié au très faible nombre d'observations électorales).
 
+![Corrélation des indicateurs avec le taux d'abstention](data/clean/correlation_abstention_rate.png)
+
 ### 5.2 Comparaison des modèles (apprentissage)
 
 | Modèle               | MAE   | RMSE  | R²    | MAE (points) |
@@ -174,6 +176,8 @@ hors apprentissage et il atténue la multicolinéarité.
 | 2022  | T1   | 0.245 | 0.262 | 0.017 |
 | 2022  | T2   | 0.288 | 0.262 | 0.027 |
 
+![Taux d'abstention observé vs prédit (Ridge)](data/clean/actual_predicted_abstention.png)
+
 ### 5.5 Coefficients du modèle Ridge
 
 | Variable                       | Coefficient |
@@ -190,6 +194,8 @@ hors apprentissage et il atténue la multicolinéarité.
 | `croissance_pct_norm`          | +0.0024 |
 | `total_faits_delictueux_norm`  | +0.0021 |
 
+![Influence des variables dans le modèle Ridge](data/clean/influence_ridge_model.png)
+
 Lecture : les indicateurs d'inégalité et de précarité ont un signe négatif (Ridge pénalise
 l'abstention prédite lorsqu'ils augmentent), tandis que les indicateurs liés au dynamisme local
 ont un signe positif. L'amplitude reste faible car les variables sont normalisées et le modèle est
@@ -202,6 +208,8 @@ régularisé.
 | 2026  | 0.266 (26.6 %) | 0.734 (73.4 %) |
 | 2027  | 0.266 (26.6 %) | 0.734 (73.4 %) |
 | 2028  | 0.266 (26.6 %) | 0.734 (73.4 %) |
+
+![Projection du taux d'abstention 2026 – 2028](data/clean/projection_abstention_rate.png)
 
 La projection est quasi-constante : les indicateurs explicatifs sont eux-mêmes extrapolés par
 régression linéaire sur leur tendance temporelle, et la régularisation Ridge écrase les variations
