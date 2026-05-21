@@ -50,7 +50,10 @@ source .venv/Scripts/activate   # Git Bash
 .venv\Scripts\activate          # PowerShell / CMD
 
 # Installer les dépendances
-pip install jupyter pandas numpy matplotlib seaborn missingno requests xlrd openpyxl
+pip install -r requirements.txt
+
+# Lancer la pipeline
+python pipeline.py
 
 # Lancer Jupyter
 jupyter notebook
