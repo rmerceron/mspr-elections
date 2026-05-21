@@ -20,32 +20,33 @@ Sorties :
 # ============================================================
 # 0. IMPORTS & CONFIGURATION
 # ============================================================
-import os
-import io
 import gzip
-import sqlite3
+import io
 import logging
-import requests
+import os
+import sqlite3
 import warnings
-import pandas as pd
-import numpy as np
 from datetime import datetime
+
+import numpy as np
+import pandas as pd
+import requests
 
 warnings.filterwarnings("ignore")
 
 # ── Constantes géographiques ────────────────────────────────
 CODE_COMMUNE = "44109"
-NOM_COMMUNE  = "Nantes"
-CODE_DEP     = "44"
-NOM_DEP      = "Loire-Atlantique"
-CODE_REGION  = "52"
+NOM_COMMUNE = "Nantes"
+CODE_DEP = "44"
+NOM_DEP = "Loire-Atlantique"
+CODE_REGION = "52"
 
 # ── Dossiers ────────────────────────────────────────────────
-RAW_DIR   = os.path.join("data", "raw")
+RAW_DIR = os.path.join("data", "raw")
 CLEAN_DIR = os.path.join("data", "clean")
-DB_PATH   = os.path.join(CLEAN_DIR, "electio_analytics.db")
+DB_PATH = os.path.join(CLEAN_DIR, "electio_analytics.db")
 
-os.makedirs(RAW_DIR,   exist_ok=True)
+os.makedirs(RAW_DIR, exist_ok=True)
 os.makedirs(CLEAN_DIR, exist_ok=True)
 
 # ── URLs sources ────────────────────────────────────────────
@@ -80,7 +81,12 @@ URL_SECURITE = (
     "20260129-160318/donnee-dep-data.gouv-2025-geographie2025-produit-le2026-01-22.csv"
 )
 
-URL_GEO_INSEE = f"https://geo.api.gouv.fr/communes/{CODE_COMMUNE}?fields=nom,code,population"
+URL_GEO_INSEE = (
+    f"https://geo.api.gouv.fr/communes/{CODE_COMMUNE}?fields=nom,code,population"
+)
+
+URL_GEOJSON = "https://data.nantesmetropole.fr/api/explore/v2.1/catalog/datasets/244400404_decoupage-geographique-bureaux-vote-nantes/exports/geojson?lang=fr&timezone=Europe%2FBerlin"
+
 
 # ── Logging ─────────────────────────────────────────────────
 logging.basicConfig(
@@ -98,6 +104,7 @@ log = logging.getLogger("pipeline")
 # ============================================================
 # 1. EXTRACT — Récupération des données brutes
 # ============================================================
+
 
 def telecharger_fichier(url: str, nom_fichier: str) -> bytes | None:
     """Télécharge un fichier depuis une URL et le met en cache local."""
@@ -117,6 +124,7 @@ def telecharger_fichier(url: str, nom_fichier: str) -> bytes | None:
     except Exception as e:
         log.error(f"  [✗] Erreur téléchargement {nom_fichier} : {e}")
         return None
+
 
 def normaliser_colonnes(df: pd.DataFrame) -> pd.DataFrame:
     """Normalise les noms de colonnes en snake_case."""
@@ -204,6 +212,7 @@ def lire_csv_2022_nantes(chemin: str, annee: int, tour: str) -> pd.DataFrame:
 
     return df
 
+
 def extract_elections() -> dict[str, pd.DataFrame | None]:
     """EXTRACT — Résultats électoraux Nantes 2017 et 2022."""
     log.info("── EXTRACT : Données électorales ──────────────────────────")
@@ -263,10 +272,23 @@ def extract_demographie() -> pd.DataFrame:
     """EXTRACT — Série population Nantes (INSEE + API géo)."""
     log.info("── EXTRACT : Données démographiques (INSEE) ───────────────")
     # Série historique INSEE (recensements 2006-2021)
-    pop = pd.DataFrame({
-        "annee":      [2006, 2008, 2010, 2013, 2015, 2017, 2018, 2019, 2020, 2021],
-        "population": [282047, 284970, 288359, 291604, 298029, 303382, 306694, 309346, 314138, 320732],
-    })
+    pop = pd.DataFrame(
+        {
+            "annee": [2006, 2008, 2010, 2013, 2015, 2017, 2018, 2019, 2020, 2021],
+            "population": [
+                282047,
+                284970,
+                288359,
+                291604,
+                298029,
+                303382,
+                306694,
+                309346,
+                314138,
+                320732,
+            ],
+        }
+    )
     # Enrichissement via API géo INSEE (population légale la plus récente)
     try:
         r = requests.get(URL_GEO_INSEE, timeout=10)
@@ -293,12 +315,29 @@ def extract_emploi() -> pd.DataFrame:
     log.info("── EXTRACT : Données emploi (INSEE zone 5301) ─────────────")
     # Source : INSEE — Taux de chômage BIT, zone d'emploi Nantes (code 5301)
     # https://www.insee.fr/fr/statistiques/1893230
-    df = pd.DataFrame({
-        "annee":            list(range(2012, 2026)),
-        "taux_chomage_pct": [9.0, 9.3, 9.5, 9.8, 10.0, 9.5, 9.0, 8.5, 8.1, 7.8, 6.9, 6.5, 6.8, 6.3],
-        "source":           "INSEE — Zone emploi 5301",
-        "code_commune":     CODE_COMMUNE,
-    })
+    df = pd.DataFrame(
+        {
+            "annee": list(range(2012, 2026)),
+            "taux_chomage_pct": [
+                9.0,
+                9.3,
+                9.5,
+                9.8,
+                10.0,
+                9.5,
+                9.0,
+                8.5,
+                8.1,
+                7.8,
+                6.9,
+                6.5,
+                6.8,
+                6.3,
+            ],
+            "source": "INSEE — Zone emploi 5301",
+            "code_commune": CODE_COMMUNE,
+        }
+    )
     log.info(f"  → {len(df)} années chargées (2012–2025)")
     return df
 
@@ -308,15 +347,29 @@ def extract_entreprises() -> pd.DataFrame:
     log.info("── EXTRACT : Données entreprises (INSEE SIRENE) ───────────")
     # Source : INSEE Démographie des entreprises
     # https://www.insee.fr/fr/statistiques/serie/001594048
-    df = pd.DataFrame({
-        "annee":        list(range(2012, 2026)),
-        "creations_entreprises": [
-            6842, 6910, 7205, 7580, 8100, 9200, 10150, 11300,
-            9800, 12500, 13200, 14100, 14800, 15200,
-        ],
-        "source":       "INSEE — Démographie entreprises",
-        "code_commune": CODE_COMMUNE,
-    })
+    df = pd.DataFrame(
+        {
+            "annee": list(range(2012, 2026)),
+            "creations_entreprises": [
+                6842,
+                6910,
+                7205,
+                7580,
+                8100,
+                9200,
+                10150,
+                11300,
+                9800,
+                12500,
+                13200,
+                14100,
+                14800,
+                15200,
+            ],
+            "source": "INSEE — Démographie entreprises",
+            "code_commune": CODE_COMMUNE,
+        }
+    )
     # Tentative API recherche-entreprises (nombre total d'établissements actifs)
     try:
         url = "https://recherche-entreprises.api.gouv.fr/search?code_postal=44000,44100,44200,44300&page=1&per_page=1"
@@ -337,15 +390,17 @@ def extract_filosofi() -> pd.DataFrame:
     log.info("── EXTRACT : Données Filosofi (INSEE) ────────────────────")
     # Source : INSEE Filosofi — Commune 44109
     # https://www.insee.fr/fr/statistiques/7756941
-    df = pd.DataFrame({
-        "annee":            [2015, 2016, 2017, 2018, 2019, 2020, 2021],
-        "revenu_median_uc": [20640, 20980, 21350, 21820, 22150, 22400, 22890],
-        "taux_pauvrete_pct":[17.8,  18.1,  17.9,  17.5,  17.2,  17.0,  16.8],
-        "indice_gini":      [0.335, 0.337, 0.334, 0.332, 0.330, 0.328, 0.326],
-        "rapport_d9_d1":    [4.20,  4.25,  4.20,  4.15,  4.10,  4.05,  4.00],
-        "source":           "INSEE Filosofi",
-        "code_commune":     CODE_COMMUNE,
-    })
+    df = pd.DataFrame(
+        {
+            "annee": [2015, 2016, 2017, 2018, 2019, 2020, 2021],
+            "revenu_median_uc": [20640, 20980, 21350, 21820, 22150, 22400, 22890],
+            "taux_pauvrete_pct": [17.8, 18.1, 17.9, 17.5, 17.2, 17.0, 16.8],
+            "indice_gini": [0.335, 0.337, 0.334, 0.332, 0.330, 0.328, 0.326],
+            "rapport_d9_d1": [4.20, 4.25, 4.20, 4.15, 4.10, 4.05, 4.00],
+            "source": "INSEE Filosofi",
+            "code_commune": CODE_COMMUNE,
+        }
+    )
     log.info(f"  → {len(df)} années chargées (2015–2021)")
     return df
 
@@ -367,36 +422,91 @@ def extract_associations() -> pd.DataFrame:
             for res in d.get("resources", []):
                 if res.get("format", "").lower() == "csv":
                     url_csv = res.get("url", "")
-                    df_rna = pd.read_csv(url_csv, sep=",", encoding="utf-8",
-                                         low_memory=False, nrows=100, on_bad_lines="skip")
+                    df_rna = pd.read_csv(
+                        url_csv,
+                        sep=",",
+                        encoding="utf-8",
+                        low_memory=False,
+                        nrows=100,
+                        on_bad_lines="skip",
+                    )
                     if any("commune" in c.lower() for c in df_rna.columns):
                         log.info(f"  → RNA téléchargé depuis data.gouv.fr")
                         # Filtrer sur Nantes
-                        col_com = next((c for c in df_rna.columns if "commune" in c.lower()), None)
+                        col_com = next(
+                            (c for c in df_rna.columns if "commune" in c.lower()), None
+                        )
                         if col_com:
-                            df_nantes = df_rna[df_rna[col_com].astype(str).str.contains("NANTES", na=False)]
+                            df_nantes = df_rna[
+                                df_rna[col_com]
+                                .astype(str)
+                                .str.contains("NANTES", na=False)
+                            ]
                             if not df_nantes.empty:
-                                log.info(f"  → {len(df_nantes)} associations trouvées pour Nantes")
+                                log.info(
+                                    f"  → {len(df_nantes)} associations trouvées pour Nantes"
+                                )
     except Exception:
         pass
 
     # Données synthétiques RNA (estimations publiées par l'INSEE/RNA)
-    df = pd.DataFrame({
-        "annee":               list(range(2012, 2026)),
-        "nb_associations":     [4200, 4350, 4500, 4680, 4850, 5020, 5180, 5350,
-                                 5100, 5280, 5420, 5560, 5700, 5820],
-        "creations_asso":      [320, 340, 360, 385, 400, 410, 420, 435,
-                                 280, 350, 360, 370, 380, 390],
-        "source":              "RNA — Ministère de l'Intérieur (estimation)",
-        "code_commune":        CODE_COMMUNE,
-    })
+    df = pd.DataFrame(
+        {
+            "annee": list(range(2012, 2026)),
+            "nb_associations": [
+                4200,
+                4350,
+                4500,
+                4680,
+                4850,
+                5020,
+                5180,
+                5350,
+                5100,
+                5280,
+                5420,
+                5560,
+                5700,
+                5820,
+            ],
+            "creations_asso": [
+                320,
+                340,
+                360,
+                385,
+                400,
+                410,
+                420,
+                435,
+                280,
+                350,
+                360,
+                370,
+                380,
+                390,
+            ],
+            "source": "RNA — Ministère de l'Intérieur (estimation)",
+            "code_commune": CODE_COMMUNE,
+        }
+    )
     log.info(f"  → {len(df)} années chargées (2012–2025)")
     return df
+
+
+def extract_geodata() -> str | None:
+    """EXTRACT — Télécharge les contours des bureaux de vote de Nantes (GeoJSON)."""
+    log.info("── EXTRACT : Données géographiques (Cartographie) ─────────")
+    # On utilise ta propre fonction telecharger_fichier qui gère le cache !
+    contenu = telecharger_fichier(URL_GEOJSON, "bureaux_vote_nantes.geojson")
+    if contenu is None:
+        return None
+    return os.path.join(RAW_DIR, "bureaux_vote_nantes.geojson")
 
 
 # ============================================================
 # 2. TRANSFORM — Nettoyage et normalisation
 # ============================================================
+
 
 def _detecter_col(df: pd.DataFrame, mots_cles: list[str]) -> str | None:
     """Détecte la première colonne dont le nom contient un des mots-clés."""
@@ -435,17 +545,29 @@ def transform_elections(dfs: dict[str, pd.DataFrame | None]) -> dict[str, pd.Dat
         }
 
         df_clean = df_clean.rename(
-            columns={old: new for old, new in renommage.items() if old in df_clean.columns}
+            columns={
+                old: new for old, new in renommage.items() if old in df_clean.columns
+            }
         )
 
         # Conversion numérique des colonnes électorales principales
-        for col in ["inscrits", "votants", "blancs", "nuls", "exprimes", "abstentions", "procurations"]:
+        for col in [
+            "inscrits",
+            "votants",
+            "blancs",
+            "nuls",
+            "exprimes",
+            "abstentions",
+            "procurations",
+        ]:
             if col in df_clean.columns:
                 df_clean[col] = pd.to_numeric(df_clean[col], errors="coerce")
 
         # Taux électoraux
         if "inscrits" in df_clean.columns and "votants" in df_clean.columns:
-            df_clean["taux_participation"] = (df_clean["votants"] / df_clean["inscrits"]).round(4)
+            df_clean["taux_participation"] = (
+                df_clean["votants"] / df_clean["inscrits"]
+            ).round(4)
             df_clean["taux_abstention"] = (1 - df_clean["taux_participation"]).round(4)
 
         df_clean["zone_analyse"] = NOM_COMMUNE
@@ -457,11 +579,14 @@ def transform_elections(dfs: dict[str, pd.DataFrame | None]) -> dict[str, pd.Dat
         if avant != len(df_clean):
             log.info(f"  → {cle} : {avant - len(df_clean)} doublon(s) supprimé(s)")
 
-        log.info(f"  → {cle} : {df_clean.shape[0]} lignes × {df_clean.shape[1]} colonnes")
+        log.info(
+            f"  → {cle} : {df_clean.shape[0]} lignes × {df_clean.shape[1]} colonnes"
+        )
 
         resultats[cle] = df_clean
 
     return resultats
+
 
 def construire_cible_electorale(elections: dict[str, pd.DataFrame]) -> pd.DataFrame:
     """Construit la cible électorale agrégée : participation / abstention par année et tour."""
@@ -496,25 +621,39 @@ def construire_cible_electorale(elections: dict[str, pd.DataFrame]) -> pd.DataFr
 
         inscrits = pd.to_numeric(df_agreg["inscrits"], errors="coerce").sum()
         votants = pd.to_numeric(df_agreg["votants"], errors="coerce").sum()
-        blancs = pd.to_numeric(df_agreg["blancs"], errors="coerce").sum() if "blancs" in df_agreg.columns else np.nan
-        nuls = pd.to_numeric(df_agreg["nuls"], errors="coerce").sum() if "nuls" in df_agreg.columns else np.nan
-        exprimes = pd.to_numeric(df_agreg["exprimes"], errors="coerce").sum() if "exprimes" in df_agreg.columns else np.nan
+        blancs = (
+            pd.to_numeric(df_agreg["blancs"], errors="coerce").sum()
+            if "blancs" in df_agreg.columns
+            else np.nan
+        )
+        nuls = (
+            pd.to_numeric(df_agreg["nuls"], errors="coerce").sum()
+            if "nuls" in df_agreg.columns
+            else np.nan
+        )
+        exprimes = (
+            pd.to_numeric(df_agreg["exprimes"], errors="coerce").sum()
+            if "exprimes" in df_agreg.columns
+            else np.nan
+        )
 
-        lignes.append({
-            "annee": int(df_agreg["annee"].iloc[0]),
-            "tour": df_agreg["tour"].iloc[0],
-            "zone_analyse": NOM_COMMUNE,
-            "code_commune": CODE_COMMUNE,
-            "niveau_geo_electoral": niveau_geo,
-            "nb_unites_geo": int(nb_unites),
-            "inscrits": int(inscrits),
-            "votants": int(votants),
-            "blancs": int(blancs) if not pd.isna(blancs) else None,
-            "nuls": int(nuls) if not pd.isna(nuls) else None,
-            "exprimes": int(exprimes) if not pd.isna(exprimes) else None,
-            "taux_participation": round(votants / inscrits, 4),
-            "taux_abstention": round(1 - (votants / inscrits), 4),
-        })
+        lignes.append(
+            {
+                "annee": int(df_agreg["annee"].iloc[0]),
+                "tour": df_agreg["tour"].iloc[0],
+                "zone_analyse": NOM_COMMUNE,
+                "code_commune": CODE_COMMUNE,
+                "niveau_geo_electoral": niveau_geo,
+                "nb_unites_geo": int(nb_unites),
+                "inscrits": int(inscrits),
+                "votants": int(votants),
+                "blancs": int(blancs) if not pd.isna(blancs) else None,
+                "nuls": int(nuls) if not pd.isna(nuls) else None,
+                "exprimes": int(exprimes) if not pd.isna(exprimes) else None,
+                "taux_participation": round(votants / inscrits, 4),
+                "taux_abstention": round(1 - (votants / inscrits), 4),
+            }
+        )
 
     cible = pd.DataFrame(lignes).sort_values(["annee", "tour"]).reset_index(drop=True)
 
@@ -571,29 +710,50 @@ def transform_consolider(
     log.info("── TRANSFORM : Consolidation du dataset annuel ─────────────")
 
     ANNEES = list(range(2012, 2026))
-    df = pd.DataFrame({"annee": ANNEES, "code_commune": CODE_COMMUNE, "nom_commune": NOM_COMMUNE})
+    df = pd.DataFrame(
+        {"annee": ANNEES, "code_commune": CODE_COMMUNE, "nom_commune": NOM_COMMUNE}
+    )
 
     # Merge démographie
-    df = df.merge(pop[["annee", "population", "croissance_pct"]], on="annee", how="left")
+    df = df.merge(
+        pop[["annee", "population", "croissance_pct"]], on="annee", how="left"
+    )
 
     # Merge emploi
     df = df.merge(emploi[["annee", "taux_chomage_pct"]], on="annee", how="left")
 
     # Merge entreprises
-    df = df.merge(entreprises[["annee", "creations_entreprises"]], on="annee", how="left")
+    df = df.merge(
+        entreprises[["annee", "creations_entreprises"]], on="annee", how="left"
+    )
 
     # Merge Filosofi
     df = df.merge(
-        filosofi[["annee", "revenu_median_uc", "taux_pauvrete_pct", "indice_gini", "rapport_d9_d1"]],
-        on="annee", how="left",
+        filosofi[
+            [
+                "annee",
+                "revenu_median_uc",
+                "taux_pauvrete_pct",
+                "indice_gini",
+                "rapport_d9_d1",
+            ]
+        ],
+        on="annee",
+        how="left",
     )
 
     # Merge associations
-    df = df.merge(associations[["annee", "nb_associations", "creations_asso"]], on="annee", how="left")
+    df = df.merge(
+        associations[["annee", "nb_associations", "creations_asso"]],
+        on="annee",
+        how="left",
+    )
 
     # Merge sécurité agrégée
     if secu_agg is not None and not secu_agg.empty:
-        df = df.merge(secu_agg[["annee", "total_faits_delictueux"]], on="annee", how="left")
+        df = df.merge(
+            secu_agg[["annee", "total_faits_delictueux"]], on="annee", how="left"
+        )
 
     log.info(f"  → Dataset consolidé : {df.shape[0]} lignes × {df.shape[1]} colonnes")
     return df
@@ -607,14 +767,24 @@ def transform_nettoyer(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
 
     # Interpolation linéaire sur les séries temporelles continues
     cols_interpoler = [
-        "population", "croissance_pct", "taux_chomage_pct", "creations_entreprises",
-        "revenu_median_uc", "taux_pauvrete_pct", "indice_gini", "rapport_d9_d1",
-        "nb_associations", "creations_asso", "total_faits_delictueux",
+        "population",
+        "croissance_pct",
+        "taux_chomage_pct",
+        "creations_entreprises",
+        "revenu_median_uc",
+        "taux_pauvrete_pct",
+        "indice_gini",
+        "rapport_d9_d1",
+        "nb_associations",
+        "creations_asso",
+        "total_faits_delictueux",
     ]
     for col in cols_interpoler:
         if col in df_clean.columns and df_clean[col].isna().any():
             avant = df_clean[col].isna().sum()
-            df_clean[col] = df_clean[col].interpolate(method="linear", limit_direction="both")
+            df_clean[col] = df_clean[col].interpolate(
+                method="linear", limit_direction="both"
+            )
             apres = df_clean[col].isna().sum()
             log.info(f"  → Interpolation '{col}' : {avant} → {apres} NaN")
 
@@ -629,7 +799,9 @@ def transform_nettoyer(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     nan_total = df_clean.isnull().sum().sum()
     log.info(f"  → Valeurs manquantes restantes : {nan_total}")
     log.info(f"  → Dataset nettoyé : {df_clean.shape}")
-    log.info(f"  → Dataset normalisé : {df_norm.shape} ({len([c for c in df_norm.columns if c.endswith('_norm')])} colonnes _norm)")
+    log.info(
+        f"  → Dataset normalisé : {df_norm.shape} ({len([c for c in df_norm.columns if c.endswith('_norm')])} colonnes _norm)"
+    )
 
     return df_clean, df_norm
 
@@ -637,6 +809,7 @@ def transform_nettoyer(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
 # ============================================================
 # 3. LOAD — Chargement dans SQLite et export CSV
 # ============================================================
+
 
 def load_sqlite(
     df_clean: pd.DataFrame,
@@ -668,7 +841,9 @@ def load_sqlite(
 
     # Table cible électorale agrégée
     if target_elections is not None and not target_elections.empty:
-        target_elections.to_sql("target_elections", con, if_exists="replace", index=False)
+        target_elections.to_sql(
+            "target_elections", con, if_exists="replace", index=False
+        )
         log.info(f"  → Table 'target_elections' : {len(target_elections)} lignes")
 
     # Table sécurité brute département 44
@@ -677,21 +852,29 @@ def load_sqlite(
         log.info(f"  → Table 'securite_dep44' : {len(df_secu_brut)} lignes")
 
     # Table pipeline_log (traçabilité)
-    log_entry = pd.DataFrame([{
-        "date_execution":  datetime.now().isoformat(),
-        "nb_lignes_clean": len(df_clean),
-        "nb_colonnes":     len(df_clean.columns),
-        "periode":         f"{df_clean['annee'].min()}–{df_clean['annee'].max()}",
-        "commune":         NOM_COMMUNE,
-        "code_insee":      CODE_COMMUNE,
-        "sources":         "elections,securite,demographie,emploi,entreprises,filosofi,associations",
-    }])
+    log_entry = pd.DataFrame(
+        [
+            {
+                "date_execution": datetime.now().isoformat(),
+                "nb_lignes_clean": len(df_clean),
+                "nb_colonnes": len(df_clean.columns),
+                "periode": f"{df_clean['annee'].min()}–{df_clean['annee'].max()}",
+                "commune": NOM_COMMUNE,
+                "code_insee": CODE_COMMUNE,
+                "sources": "elections,securite,demographie,emploi,entreprises,filosofi,associations",
+            }
+        ]
+    )
     log_entry.to_sql("pipeline_log", con, if_exists="append", index=False)
     log.info("  → Table 'pipeline_log' mise à jour")
 
     # Créer les index pour optimiser les requêtes
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_indic_annee ON indicateurs_annuels(annee)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_indic_commune ON indicateurs_annuels(code_commune)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_indic_annee ON indicateurs_annuels(annee)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_indic_commune ON indicateurs_annuels(code_commune)"
+    )
 
     con.commit()
     con.close()
@@ -714,7 +897,7 @@ def load_csv(
         log.info(f"  → {nom} ({df.shape[0]} lignes)")
 
     sauvegarder(df_clean, "nantes_indicateurs_clean.csv")
-    sauvegarder(df_norm,  "nantes_indicateurs_normalises.csv")
+    sauvegarder(df_norm, "nantes_indicateurs_normalises.csv")
 
     for cle, df in elections.items():
         if df is not None and not df.empty:
@@ -731,6 +914,7 @@ def load_csv(
 # 4. PIPELINE — Orchestration E → T → L
 # ============================================================
 
+
 def run_pipeline() -> None:
     """Point d'entrée principal : enchaîne Extract → Transform → Load."""
     debut = datetime.now()
@@ -740,20 +924,23 @@ def run_pipeline() -> None:
     log.info("=" * 60)
 
     # ── EXTRACT ──────────────────────────────────────────────
-    elections_raw  = extract_elections()
-    securite_raw   = extract_securite()
-    pop            = extract_demographie()
-    emploi         = extract_emploi()
-    entreprises    = extract_entreprises()
-    filosofi       = extract_filosofi()
-    associations   = extract_associations()
+    elections_raw = extract_elections()
+    securite_raw = extract_securite()
+    pop = extract_demographie()
+    emploi = extract_emploi()
+    entreprises = extract_entreprises()
+    filosofi = extract_filosofi()
+    associations = extract_associations()
+    geodata_path = extract_geodata()
 
     # ── TRANSFORM ────────────────────────────────────────────
     elections_clean = transform_elections(elections_raw)
     target_elections = construire_cible_electorale(elections_clean)
 
     securite_agg = transform_securite(securite_raw)
-    df_consolide = transform_consolider(pop, emploi, entreprises, filosofi, associations, securite_agg)
+    df_consolide = transform_consolider(
+        pop, emploi, entreprises, filosofi, associations, securite_agg
+    )
     df_clean, df_norm = transform_nettoyer(df_consolide)
 
     # ── LOAD ─────────────────────────────────────────────────
@@ -769,8 +956,14 @@ def run_pipeline() -> None:
     log.info(f"  Colonnes       : {len(df_clean.columns)}")
     log.info(f"  Période        : {df_clean['annee'].min()}–{df_clean['annee'].max()}")
     log.info(f"  Base SQLite    : {os.path.abspath(DB_PATH)}")
-    log.info(f"  CSV nettoyé    : {os.path.join(CLEAN_DIR, 'nantes_indicateurs_clean.csv')}")
-    log.info(f"  CSV normalisé  : {os.path.join(CLEAN_DIR, 'nantes_indicateurs_normalises.csv')}")
+    log.info(
+        f"  CSV nettoyé    : {os.path.join(CLEAN_DIR, 'nantes_indicateurs_clean.csv')}"
+    )
+    log.info(
+        f"  CSV normalisé  : {os.path.join(CLEAN_DIR, 'nantes_indicateurs_normalises.csv')}"
+    )
+    if geodata_path:
+        log.info(f"  Carte GeoJSON  : {geodata_path}")
     log.info("=" * 60)
 
 

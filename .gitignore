@@ -21,6 +21,7 @@ build/
 data/raw/*.xls
 data/raw/*.xlsx
 data/raw/*.csv
+data/raw/*.geojson
 
 # Données nettoyées (régénérables)
 data/clean/
